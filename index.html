@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>経理人生ゲーム ～3月決算の一年～</title>
+  <meta name="description" content="経理業務を人生ゲーム形式で楽しめる1人用ブラウザゲーム。3月決算の会社で、決算・申告・年末調整を乗り越えてCFOを目指そう。">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧮</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- タイトル画面 -->
+  <section id="title-screen" class="screen">
+    <div class="title-card">
+      <p class="title-sub">～ 3月決算の一年 ～</p>
+      <h1 class="title-logo">🧮 経理人生ゲーム</h1>
+      <p class="title-lead">決算短信、確定申告、年末調整…。<br>経理の一年をサイコロで駆け抜けて、CFOを目指そう！</p>
+
+      <form id="start-form" class="start-form">
+        <label class="field">
+          <span class="field-label">あなたの名前</span>
+          <input id="player-name" name="name" type="text" maxlength="12" placeholder="経理 太郎" autocomplete="off">
+        </label>
+
+        <fieldset class="field">
+          <legend class="field-label">入社のしかた</legend>
+          <div id="route-options" class="option-grid"></div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend class="field-label">プレイする期数</legend>
+          <div id="length-options" class="option-row"></div>
+        </fieldset>
+
+        <div class="start-buttons">
+          <button type="submit" class="btn btn-primary btn-large">🎲 ゲームスタート</button>
+          <button type="button" id="continue-btn" class="btn btn-secondary btn-large" hidden>📂 つづきから</button>
+        </div>
+      </form>
+
+      <details class="howto">
+        <summary>遊び方</summary>
+        <ul>
+          <li>4月（期首）の START から3月の決算日 GOAL まで、一本の道をサイコロで進みます。</li>
+          <li><strong>🔀 分かれ道</strong>が6〜7月・10月・2月の3か所。開示／税務、プロジェクト／定常業務、経営企画／資格学習と、進むルートを選べます。</li>
+          <li><strong>⏩ 進む・⏪ 戻る</strong>マスもあります。戻るときは通ってきた道を引き返します（移動先のマスのイベントは起きません）。</li>
+          <li>月をまたぐと<strong>給料日</strong>。月給から生活費を引いた分が所持金に入ります。</li>
+          <li>業務マスでは「🎲＋スキル補正」で判定。残業すれば判定＋2（でもストレスが増える）。</li>
+          <li><strong>3/31 決算日</strong>は必ず止まるマス。期末評価（スキル＋信頼）で昇進が決まります。</li>
+          <li>課長以上には簿記2級、CFOには簿記1級が必要。11月の簿記検定は必ず通り、6月・2月は分かれ道の選び方しだい。</li>
+          <li>ストレスが100になると体調を崩して1回休み。夏休みや忘年会でうまく発散を。</li>
+          <li>最終期の決算日を迎えたら「人生の決算報告」。資産・役職・資格・家族などで称号が決まります。</li>
+        </ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- ゲーム画面 -->
+  <section id="game-screen" class="screen" hidden>
+    <header class="game-header">
+      <h1 class="game-logo">🧮 経理人生ゲーム</h1>
+      <div id="period-label" class="period-label"></div>
+      <button type="button" id="menu-btn" class="btn btn-ghost btn-small">メニュー</button>
+    </header>
+
+    <main class="game-main">
+      <div class="board-wrap">
+        <div id="board" class="board" aria-label="盤面"></div>
+      </div>
+
+      <aside class="side">
+        <div class="panel status-panel">
+          <div class="player-line">
+            <span class="player-avatar">🧑‍💼</span>
+            <div>
+              <div id="st-name" class="player-name"></div>
+              <div id="st-rank" class="player-rank"></div>
+            </div>
+          </div>
+          <dl class="stats">
+            <div><dt>💴 所持金</dt><dd id="st-money"></dd></div>
+            <div><dt>📈 投資</dt><dd id="st-investment"></dd></div>
+            <div><dt>🧾 月給／生活費</dt><dd id="st-salary"></dd></div>
+          </dl>
+          <div class="bars">
+            <div class="bar-row"><span>📚 スキル</span><div class="bar"><div id="bar-skill" class="bar-fill skill"></div></div><b id="st-skill"></b></div>
+            <div class="bar-row"><span>🤝 信頼</span><div class="bar"><div id="bar-trust" class="bar-fill trust"></div></div><b id="st-trust"></b></div>
+            <div class="bar-row"><span>😵 ストレス</span><div class="bar"><div id="bar-stress" class="bar-fill stress"></div></div><b id="st-stress"></b></div>
+          </div>
+          <div id="st-badges" class="badges"></div>
+          <div id="st-next" class="next-rank"></div>
+        </div>
+
+        <div class="panel dice-panel">
+          <div id="dice" class="dice" aria-live="polite">🎲</div>
+          <button type="button" id="roll-btn" class="btn btn-primary btn-large">サイコロを振る</button>
+          <p id="dice-hint" class="dice-hint"></p>
+        </div>
+
+        <div class="panel log-panel">
+          <h2 class="panel-title">📒 業務日誌</h2>
+          <ol id="log" class="log"></ol>
+        </div>
+      </aside>
+    </main>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="result-screen" class="screen" hidden>
+    <div class="result-card">
+      <p class="title-sub">人生の決算報告</p>
+      <div id="result-title" class="result-title"></div>
+      <p id="result-comment" class="result-comment"></p>
+      <table class="score-table">
+        <tbody id="score-body"></tbody>
+        <tfoot>
+          <tr><th>合計</th><td id="score-total"></td></tr>
+        </tfoot>
+      </table>
+      <h2 class="panel-title">各期の決算</h2>
+      <table class="history-table">
+        <thead><tr><th>期</th><th>役職</th><th>選んだルート</th><th>評価pt</th><th>所持金</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+      <p id="result-extra" class="result-extra"></p>
+      <div class="result-buttons">
+        <a id="share-btn" class="btn btn-secondary" target="_blank" rel="noopener">𝕏 でシェア</a>
+        <button type="button" id="restart-btn" class="btn btn-primary">もう一度あそぶ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- イベントモーダル -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <span id="modal-icon" class="modal-icon"></span>
+        <h2 id="modal-title" class="modal-title"></h2>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

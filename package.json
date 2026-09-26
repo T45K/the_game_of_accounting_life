@@ -1,0 +1,12 @@
+{
+  "name": "the-game-of-accounting-life",
+  "version": "1.0.0",
+  "description": "経理人生ゲーム：経理業務を人生ゲーム形式で楽しめる1人用の静的Webゲーム（3月決算）",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test 'tests/**/*.test.js'",
+    "simulate": "node scripts/simulate.js 2000"
+  }
+}
