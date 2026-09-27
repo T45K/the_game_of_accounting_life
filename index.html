@@ -65,16 +65,7 @@
 
     <main class="game-main">
       <div class="board-wrap">
-        <div id="board-stage" class="board-stage">
-          <div id="board" class="board" aria-label="盤面"></div>
-          <div class="view-controls">
-            <button type="button" id="view-left" class="view-btn" title="左に回す" aria-label="盤面を左に回す">⟲</button>
-            <button type="button" id="view-right" class="view-btn" title="右に回す" aria-label="盤面を右に回す">⟳</button>
-            <button type="button" id="view-reset" class="view-btn" title="視点をリセット" aria-label="視点をリセット">🎯</button>
-            <button type="button" id="view-toggle" class="view-btn view-btn-wide">🗺️ 全体</button>
-          </div>
-          <p class="view-hint">ドラッグで回転・傾き</p>
-        </div>
+        <div id="board" class="board" aria-label="盤面"></div>
       </div>
 
       <aside class="side">
@@ -101,9 +92,7 @@
         </div>
 
         <div class="panel dice-panel">
-          <div class="dice-stage">
-            <div id="dice" class="dice" role="img" aria-live="polite" aria-label="サイコロ"></div>
-          </div>
+          <div id="dice" class="dice" aria-live="polite">🎲</div>
           <button type="button" id="roll-btn" class="btn btn-primary btn-large">サイコロを振る</button>
           <p id="dice-hint" class="dice-hint"></p>
         </div>

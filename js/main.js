@@ -11,13 +11,6 @@ import { formatYen, signedYen, monthlySalary, livingCost, evaluationPoints, skil
 const STEP_MS = 230;
 const rng = Math.random;
 
-/** 盤面の1マス分の大きさ（px）。拡大縮小はカメラで行う */
-const UNIT = 110;
-
-/** カメラのモードごとの既定の傾き */
-const VIEW_TILT = { follow: 52, overview: 30 };
-const TILT_RANGE = [0, 70];
-
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const $ = (sel) => document.querySelector(sel);
@@ -51,8 +44,6 @@ let busy = false;
 let toastTimer = null;
 let cells = new Map();
 let roads = new Map();
-const view = { mode: 'follow', tilt: VIEW_TILT.follow, spin: 0 };
-const dice = { x: 0, y: 0 };
 
 // ---------------------------------------------------------------- screens
 
@@ -177,11 +168,8 @@ function buildBoard() {
   board.replaceChildren();
   board.style.setProperty('--cols', BOARD_COLS);
   board.style.setProperty('--rows', BOARD_ROWS);
-  board.style.width = `${BOARD_COLS * UNIT}px`;
-  board.style.height = `${BOARD_ROWS * UNIT}px`;
   cells = new Map();
   roads = new Map();
-  board.append(...sides());
   buildRoads(board);
 
   for (const sign of SIGNS) {
@@ -202,13 +190,11 @@ function buildBoard() {
       style: `--x: ${square.at[0]}; --y: ${square.at[1]}`,
       title: lane ? `${square.name}（${lane.name}）` : square.name,
     },
-    sides(),
-    el('div', { class: 'cell-face' },
-      monthStarts.has(square.id) ? el('span', { class: 'cell-month', text: `${square.month}月` }) : null,
-      el('span', { class: 'cell-icon', text: square.icon }),
-      el('span', { class: 'cell-name', text: square.name }),
-      square.note ? el('span', { class: 'cell-note', text: square.note }) : null,
-      flag ? el('span', { class: 'cell-flag', text: flag }) : null));
+    monthStarts.has(square.id) ? el('span', { class: 'cell-month', text: `${square.month}月` }) : null,
+    el('span', { class: 'cell-icon', text: square.icon }),
+    el('span', { class: 'cell-name', text: square.name }),
+    square.note ? el('span', { class: 'cell-note', text: square.note }) : null,
+    flag ? el('span', { class: 'cell-flag', text: flag }) : null);
     cells.set(square.id, cell);
     board.append(cell);
   }
@@ -218,11 +204,6 @@ function buildBoard() {
       .map(([type, name]) => el('span', { style: `--c: var(--t-${type})`, text: name })));
   $('.board-wrap').querySelector('.legend')?.remove();
   $('.board-wrap').append(legend);
-}
-
-/** 厚みを出すための側面（北・東・南・西） */
-function sides() {
-  return ['n', 'e', 's', 'w'].map((dir) => el('span', { class: `wall wall-${dir}`, 'aria-hidden': 'true' }));
 }
 
 /** 分かれ道で選ばなかったルート */
@@ -245,108 +226,15 @@ function renderBoard() {
     cell.classList.toggle('here', id === position);
     cell.classList.toggle('passed', visited.has(id) && id !== position);
     cell.classList.toggle('skipped', Boolean(lane && skipped.has(lane)));
-    for (const node of cell.querySelectorAll('.token, .token-ring')) node.remove();
+    cell.querySelector('.token')?.remove();
   }
   for (const [key, line] of roads) line.classList.toggle('walked', walkedEdges.has(key));
-  cells.get(position).append(
-    el('span', { class: 'token-ring', 'aria-hidden': 'true' }),
-    el('span', { class: 'token', role: 'img', 'aria-label': 'あなたのコマ' },
-      el('span', { class: 'token-head', text: '🧑‍💼' }),
-      el('span', { class: 'token-stem' })),
-  );
+  cells.get(position).append(el('span', { class: 'token', text: '🧑‍💼', 'aria-label': 'あなたのコマ' }));
 }
 
-// ---------------------------------------------------------------- camera
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-
-/**
- * 盤面を傾け・回して、注目点（コマ or 盤面の中心）が舞台の真ん中に来るように動かす。
- * instant ならトランジションなしで即座に反映する。
- */
-function updateCamera({ instant = false } = {}) {
-  const stage = $('#board-stage');
-  const board = $('#board');
-  const width = stage.clientWidth;
-  const height = stage.clientHeight;
-  if (!width || !height) return;
-
-  const boardW = BOARD_COLS * UNIT;
-  const boardH = BOARD_ROWS * UNIT;
-  let target = [boardW / 2, boardH / 2];
-  let zoom;
-  if (view.mode === 'overview' || !state) {
-    // 回転後の外接矩形を、傾きで縦につぶした大きさに収める
-    const spin = (view.spin * Math.PI) / 180;
-    const [cos, sin] = [Math.abs(Math.cos(spin)), Math.abs(Math.sin(spin))];
-    const fitW = boardW * cos + boardH * sin;
-    const fitH = (boardW * sin + boardH * cos) * Math.cos((view.tilt * Math.PI) / 180) + 40;
-    zoom = Math.min(width / fitW, height / fitH) * 0.8;
-  } else {
-    const [x, y] = squareOf(state.position).at;
-    target = [(x + 0.5) * UNIT, (y + 0.5) * UNIT];
-    zoom = clamp(width / 560, 0.55, 1.15);
-  }
-
-  board.classList.toggle('instant', instant);
-  board.style.setProperty('--tilt', `${view.tilt}deg`);
-  board.style.setProperty('--spin', `${view.spin}deg`);
-  board.style.transform = `translate3d(${width / 2}px, ${height * 0.55}px, 0) scale3d(${zoom}, ${zoom}, ${zoom}) `
-    + `rotateX(${view.tilt}deg) rotateZ(${view.spin}deg) translate3d(${-target[0]}px, ${-target[1]}px, 0)`;
-  if (instant) {
-    void board.offsetWidth; // 即時反映してからトランジションを戻す
-    board.classList.remove('instant');
-  }
-  $('#view-toggle').textContent = view.mode === 'overview' ? '🧑‍💼 コマ' : '🗺️ 全体';
-}
-
-function setViewMode(mode) {
-  view.mode = mode;
-  view.tilt = VIEW_TILT[mode];
-  updateCamera();
-}
-
-function setupCamera() {
-  const stage = $('#board-stage');
-  let drag = null;
-
-  stage.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || e.target.closest('button')) return;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, spin: view.spin, tilt: view.tilt };
-    stage.setPointerCapture(e.pointerId);
-    stage.classList.add('dragging');
-  });
-  stage.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    view.spin = drag.spin + (e.clientX - drag.x) * 0.35;
-    view.tilt = clamp(drag.tilt - (e.clientY - drag.y) * 0.25, ...TILT_RANGE);
-    updateCamera();
-  });
-  const endDrag = (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    drag = null;
-    stage.classList.remove('dragging');
-  };
-  stage.addEventListener('pointerup', endDrag);
-  stage.addEventListener('pointercancel', endDrag);
-  stage.addEventListener('dblclick', (e) => {
-    if (e.target.closest('button')) return;
-    view.spin = 0;
-    setViewMode(view.mode);
-  });
-
-  $('#view-left').addEventListener('click', () => { view.spin -= 45; updateCamera(); });
-  $('#view-right').addEventListener('click', () => { view.spin += 45; updateCamera(); });
-  $('#view-reset').addEventListener('click', () => { view.spin = 0; setViewMode('follow'); });
-  $('#view-toggle').addEventListener('click', () => setViewMode(view.mode === 'overview' ? 'follow' : 'overview'));
-
-  new ResizeObserver(() => updateCamera({ instant: true })).observe(stage);
-}
-
-/** カメラでコマを追いかけ、盤面が画面の外ならスクロールする */
+/** コマが画面の外に出たらスクロールして追いかける */
 function followToken() {
-  updateCamera();
-  $('#board-stage').scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  cells.get(state.position)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
 }
 
 // ---------------------------------------------------------------- status
@@ -544,51 +432,17 @@ function summarizeDeltas(deltas) {
 
 // ---------------------------------------------------------------- turn
 
-/** 各面の目を 3×3 のどの位置に打つか */
-const PIPS = {
-  1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
-};
-
-/** その目を手前に向けるための回転（X, Y） */
-const DICE_FACING = {
-  1: [0, 0], 2: [-90, 0], 3: [0, -90], 4: [0, 90], 5: [90, 0], 6: [0, 180],
-};
-
-function buildDice() {
-  $('#dice').replaceChildren(...Object.entries(PIPS).map(([value, pips]) => el('div', { class: `dice-face f${value}` },
-    Array.from({ length: 9 }, (_, i) => (pips.includes(i)
-      ? el('span', { class: 'pip', style: `grid-area: ${Math.floor(i / 3) + 1} / ${(i % 3) + 1}` })
-      : null)))));
-  setDice(1);
-}
-
-function applyDiceRotation() {
-  $('#dice').style.transform = `rotateX(-22deg) rotateY(28deg) rotateX(${dice.x}deg) rotateY(${dice.y}deg)`;
-}
-
-/** 出目を手前に向ける（extraTurns 回分余計に転がす） */
-function setDice(value, extraTurns = 0) {
-  const [fx, fy] = DICE_FACING[value];
-  const settle = (current, facing) => Math.ceil((current - facing) / 360 + extraTurns) * 360 + facing;
-  dice.x = settle(dice.x, fx);
-  dice.y = settle(dice.y, fy);
-  applyDiceRotation();
-  $('#dice').setAttribute('aria-label', `サイコロの目：${value}`);
-}
-
 async function animateDice() {
-  const cube = $('#dice');
-  cube.classList.add('rolling');
-  for (let i = 0; i < 8; i += 1) {
-    dice.x += 90 + Math.floor(rng() * 180);
-    dice.y += 90 + Math.floor(rng() * 180);
-    applyDiceRotation();
-    await sleep(80);
+  const dice = $('#dice');
+  dice.classList.add('rolling');
+  for (let i = 0; i < 10; i += 1) {
+    dice.textContent = String(rollDice(rng));
+    await sleep(55);
   }
-  cube.classList.remove('rolling');
   const value = rollDice(rng);
-  setDice(value, 1);
-  await sleep(500);
+  dice.textContent = String(value);
+  dice.classList.remove('rolling');
+  await sleep(250);
   return value;
 }
 
@@ -707,8 +561,8 @@ async function onRoll() {
 function startGameScreen() {
   buildBoard();
   render();
+  $('#dice').textContent = '🎲';
   showScreen('game-screen');
-  updateCamera({ instant: true });
   followToken();
 }
 
@@ -768,8 +622,6 @@ function showResult() {
 
 function init() {
   setupTitle();
-  setupCamera();
-  buildDice();
   $('#roll-btn').addEventListener('click', onRoll);
   $('#menu-btn').addEventListener('click', openMenu);
   $('#restart-btn').addEventListener('click', () => {
